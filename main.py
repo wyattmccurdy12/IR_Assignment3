@@ -152,9 +152,6 @@ def main():
     documents, queries = load_data(args.queries, args.documents)
     print("Data loaded successfully.")
 
-    # Split data into train, test, validation sets
-    train_queries, test_queries = train_test_split(queries, test_size=0.2, random_state=42)
-
     # Instantiate retrievers
     bi_encoder_retriever = Retriever('bi-encoder', args.bi_encoder)
     cross_encoder_retriever = Retriever('cross-encoder', args.cross_encoder)
@@ -162,7 +159,7 @@ def main():
     # Process and encode queries using bi-encoder
     print("Processing and encoding queries...")
     processed_queries = []
-    for query in tqdm(train_queries, desc="Processing queries"):
+    for query in tqdm(queries, desc="Processing queries"):
         query_id = query['Id']
         title = remove_html_tags(query['Title'])
         body = remove_html_tags(query['Body'])
@@ -175,13 +172,13 @@ def main():
     
     # Process and encode documents using bi-encoder
     print("Processing and encoding documents...")
-    processed_documents = []
+    processed_documents = {}
     for doc in tqdm(documents, desc="Processing documents"):
         doc_id = doc['Id']
         text = remove_html_tags(doc['Text'])
-        processed_documents.append((doc_id, text))
+        processed_documents[doc_id] = text
     
-    encoded_documents = bi_encoder_retriever.encode([d[1] for d in processed_documents])
+    encoded_documents = bi_encoder_retriever.encode(list(processed_documents.values()))
     print("Documents processed and encoded successfully.")
     
     # Initial ranking using bi-encoder
@@ -192,7 +189,7 @@ def main():
         # Compute similarity scores and rank documents
         scores = np.dot(encoded_documents, query_embedding)
         ranked_doc_indices = np.argsort(scores)[::-1][:100]
-        initial_rankings[query_id] = [(processed_documents[doc_id][0], scores[doc_id]) for doc_id in ranked_doc_indices]
+        initial_rankings[query_id] = [(list(processed_documents.keys())[doc_id], scores[doc_id]) for doc_id in ranked_doc_indices]
     print("Initial ranking completed.")
     
     # Extract topic number from queries file name
@@ -204,9 +201,9 @@ def main():
         re_rankings = {}  # Dictionary to store re-rankings
         for query_id, doc_scores in tqdm(initial_rankings.items(), desc="Re-ranking queries"):
             query_text = next(q[1] for q in processed_queries if q[0] == query_id)
-            doc_texts = [processed_documents[doc_id][1] for doc_id, _ in doc_scores]
+            doc_texts = [processed_documents[doc_id] for doc_id, _ in doc_scores]
             scores = cross_encoder_retriever.predict(query_text, doc_texts)
-            re_rankings[query_id] = sorted(zip([processed_documents[doc_id][0] for doc_id, _ in doc_scores], scores), key=lambda x: x[1], reverse=True)
+            re_rankings[query_id] = sorted(zip([doc_id for doc_id, _ in doc_scores], scores), key=lambda x: x[1], reverse=True)
     
         # Determine output filename
         output_filename = f"result_ce{'_ft' if args.finetuned else ''}_{topic_number}.tsv"
