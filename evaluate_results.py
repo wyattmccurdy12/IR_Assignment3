@@ -78,7 +78,7 @@ def evaluate_results(qrels, results):
     
     return aggregated_metrics, metrics_df
 
-def plot_precision(full_metrics, precision_level, output_file):
+def plot_precision(full_metrics, precision_level, output_file, results_base_name):
     """
     Plot precision at the specified level using descending bars.
 
@@ -86,6 +86,7 @@ def plot_precision(full_metrics, precision_level, output_file):
         full_metrics (pd.DataFrame): DataFrame containing the full evaluation metrics for each query.
         precision_level (str): The precision level to plot (e.g., 'P_1', 'P_5', 'P_10').
         output_file (str): Path to the output file for saving the plot.
+        results_base_name (str): Base name of the results file.
     """
     # Sort the DataFrame by the specified precision level in descending order
     sorted_metrics = full_metrics.sort_values(by=precision_level, ascending=False)
@@ -105,8 +106,8 @@ def plot_precision(full_metrics, precision_level, output_file):
     ax.set_ylabel(f'Precision@{precision_level.split("_")[1]}')
     # Rotate x-axis labels for better readability
     plt.xticks(rotation=90)
-    # Save the plot
-    plt.savefig(output_file)
+    # Save the plot with the results base name included
+    plt.savefig(f"{output_file}_{results_base_name}.png")
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluate the results of the boolean retrieval system using pytrec_eval.")
@@ -140,7 +141,10 @@ if __name__ == "__main__":
     output_dir = os.path.join(script_dir, 'figs')
     os.makedirs(output_dir, exist_ok=True)
 
+    # Extract the base name of the results file without the extension
+    results_base_name = os.path.splitext(os.path.basename(results_file))[0]
+
     # Plot and save precision plots for P_1, P_5, and P_10
     for precision_level in ['P_1', 'P_5', 'P_10']:
-        plot_file = os.path.join(output_dir, f'{precision_level.lower()}_plot.png')
-        plot_precision(full_metrics, precision_level, plot_file)
+        plot_file = os.path.join(output_dir, f'{precision_level.lower()}_plot')
+        plot_precision(full_metrics, precision_level, plot_file, results_base_name)
